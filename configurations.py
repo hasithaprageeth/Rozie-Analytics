@@ -5,7 +5,7 @@ access_token = '213560061-XKaREtskNRnH1SFt5lcQS6KaEBXJNxV1rpOnBm38'
 access_token_secret = 'K77yciRInc5maybhPAlTVkWE7PZmKPh2UbKKEWGx7aI3m'
 
 # Stream Listner
-mention_list = ['@united', '#trump'] 	# Twitter stream  listner @ list
+mention_list = ['@united'] 	# Twitter stream  listner @ list
 
 # Databases
 tweet_database_name = 'tweets.db'	# Database to store incoming tweets
