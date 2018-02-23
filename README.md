@@ -21,8 +21,12 @@ Rozie Analytics is a real-time twitter stream processor, which is used to analyz
 ## Running
 First run the clustering.py file with the following command:
 
-> python clustering.py
+```python
+python clustering.py
+```
 
 Then in another terminal run the web application with the following command:
 
-> python manage.py runserver
+```python
+python manage.py runserver
+```
