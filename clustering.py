@@ -305,7 +305,7 @@ def preprocess_tweet(ex_tweet):
 		if (user_mentions != None) and (user_mentions != []):
 			for u in user_mentions:
 				mention = u.get('screen_name')
-				ful_txt = ful_txt.replace("@" + mention, "") if mention != 'united' else ful_txt.replace("@united", "united")  #*******************************
+				ful_txt = ful_txt.replace("@" + mention, "") if mention != 'united' else ful_txt.replace("@united", "united")
 
 		if (hashtags != None) and (hashtags != []):
 			ful_txt = ful_txt.replace("#", "")
