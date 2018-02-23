@@ -1,0 +1,73 @@
+{% extends 'home/base.html' %}
+{% load static %}
+
+{%block content%}
+
+<!-- Header Section -->
+<section class="bg-dark text-white analytics-head">
+</section>
+
+<!-- Control Section -->
+<div class="container" id="control">
+  <div class="row">
+    <div class="col-lg-12">     
+      <a class="btn btn-primary recent {% if recent %} {{recent}} {% endif %}" href="{% url 'analytics:recentAnalytics' %}">Last 30 Min</a>
+      <a class="btn btn-primary full {% if full %} {{full}} {% endif %}" href="{% url 'analytics:fullAnalytics' %}">Full</a>
+    </div>       
+  </div>
+  <div class="row" id="control-action">
+    <div class="col-lg-12">     
+        <span class="btn btn-primary action-complete active"><i id="action" class="fa fa-pause pause"></i></span> 
+      </div>
+  </div>
+</div>
+
+<div id="update">{% include 'analytics/analytics-update.html' %}</div>
+
+{% endblock %}
+
+{%block script%}
+
+<script src='{% static "javascript/jquery.min.js" %}'></script>
+
+<script>
+  d3.timer(function() {
+    // Update the circle positions.
+    for (var i = 0; i < clust.length; i++) {  
+      circles[i]
+        .attr("cx", function(d) { d.x += d.dx; if (d.x > w) d.x -= w; else if (d.x < 0) d.x += w; return d.x; })
+        .attr("cy", function(d) { d.y += d.dy; if (d.y > h) d.y -= h; else if (d.y < 0) d.y += h; return d.y; });
+    }
+  });
+
+  var url_path = "";
+
+  if ('{{ recent }}' == 'active') {
+    url_path = "{% url 'analytics:recentAnalyticsUpdate' %}";
+  }
+  else {
+    url_path = "{% url 'analytics:fullAnalyticsUpdate' %}";
+  }
+
+
+  function updatePage(){
+    $('#update').html('').load(url_path);
+  }
+
+  var timer = setInterval(updatePage, 30000);
+
+  $("#action").on("click", function() {
+    $this = $(this);
+    if ($this.hasClass("play")) {
+      $this.addClass('pause').addClass('fa-pause').removeClass('play').removeClass('fa-play');
+      timer = setInterval(updatePage, 30000);
+      
+    }
+    else {
+      $this.addClass('play').addClass('fa-play').removeClass('pause').removeClass('fa-pause');
+      clearInterval(timer);
+    }
+  });
+</script>
+
+{% endblock %}

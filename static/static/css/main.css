@@ -1,0 +1,96 @@
+.demo {
+	background-color: #f05f40;
+  border-color: #f05f40;
+  color: #fff;
+}
+
+.demo:hover, .demo:focus, .demo:active {
+  color: #fff;
+  background-color: #ee4b28 !important;
+}
+
+.demo:active, .demo:focus {
+  box-shadow: 0 0 0 0.2rem rgba(240, 95, 64, 0.5) !important;
+}
+
+.analytics-head {
+	padding: 2rem 0;
+}
+
+.recent {
+  border-radius: 6px 0px 0px 6px;
+}
+
+.full {
+  border-radius: 0px 6px 6px 0px;
+}
+
+#control {
+  padding: 30px 15px 0px 0px;
+  text-align: right;
+}
+
+svg {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.summary {
+  margin: 15px 5px 15px 5px;
+  text-align: center;
+}
+
+#data {
+  padding: 0rem 0rem 4rem 0rem;
+}
+
+.data-font {
+  font-size: 11px;
+}
+
+.tab-head {
+  color: #fff;
+  background-color: #2d64a2;
+  border-color: #2d64a2;
+}
+
+.tab-data {
+  height: 800px;
+  overflow: auto;
+}
+
+.show-btn {
+  width: 100%;
+  background-color: #2d64a2;
+  border-color: #2d64a2;
+  border-radius: 0px;
+}
+
+.p-0 {
+    padding: 15px 0px 15px 0px !important;
+}
+
+.btn-primary:not(:disabled):not(.disabled).active, .btn-primary:not(:disabled):not(.disabled):active, .show>.btn-primary.dropdown-toggle {
+    color: #fff;
+    background-color: #2d64a2;
+    border-color: #2d64a2;
+}
+
+#analytics-detail {
+  padding: 1rem 0rem 2rem 0rem;
+}
+
+#info-span {
+  opacity: 1;
+  background-color: #2196f7;
+  border-color: #2196f7;
+}
+
+.action-complete {
+  border-radius: 6px;
+}
+
+#control-action {
+  padding-top: 5px;
+}

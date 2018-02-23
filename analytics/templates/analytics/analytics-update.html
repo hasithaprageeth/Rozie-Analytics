@@ -1,0 +1,118 @@
+{% load static %}
+
+<!-- Analytics Section -->
+<section class="p-0" id="analytics">  
+  <div class="container-fluid p-0">
+    <div class="row no-gutters">
+      {% for cluster in clusters %}
+        {% if clusters|length == 1 %}
+          <div class="col-lg-12 col-sm-12 col-xs-12">
+        {% elif clusters|length == 2 or clusters|length == 4 %}
+          <div class="col-lg-6 col-sm-6 col-xs-12">
+        {% else %}
+          <div class="col-lg-3 col-sm-6 col-xs-12">
+        {% endif %}
+          <a class="portfolio-box" href="{% if recent %} {% url 'analytics:recentAnalyticsDetail' cluster.cluster_id %} {% endif %} {% if full %} {% url 'analytics:fullAnalyticsDetail' cluster.cluster_id  %} {% endif %}">
+            <div id="id{{ forloop.counter }}"></div>
+            <div class="portfolio-box-caption">
+              <div class="portfolio-box-caption-content">
+                <div class="project-category text-faded">
+                  Cluster
+                </div>
+                <div class="project-name">
+                  {{ cluster.cluster_id }}
+                </div>
+              </div>
+            </div>
+          </a>
+          <div class="summary">{{ records.cluster.cluster_id.summary }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Table Section -->
+<section id="data">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-12 col-sm-12 col-xs-12">
+        <table class="table table-hover">
+          <thead class="tab-head">
+            <tr>
+              <th scope="col">Cluster</th>
+              <th scope="col">Summery</th>
+              <th scope="col">Tweet Rate (per min)</th>
+            </tr>
+          </thead>
+          <tbody class="tab-data">
+            {% for record in records %}
+            <tr>
+              <td>{{ record.cluster_id }}</td>
+              <td>{{ record.summary }}</td>
+              <td>{{ record.tweet_rate }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table> 
+      </div>       
+    </div>
+    {% if records|length > 15 %}
+      <button class="show-all show-btn btn btn-primary btn-md">Show All</button>
+    {% endif %}
+  </div>
+</section>
+
+{% block script %}
+
+<script src='{% static "javascript/jquery.min.js" %}'></script>
+<script src='{% static "javascript/d3.js" %}'></script>
+
+<script>
+  $("table > tbody > tr").hide().slice(0, 10).show();
+  $(".show-all").on("click", function() {
+    $("tbody > tr", $(this).prev()).show();
+    $(".show-all").remove();
+  });
+</script>
+
+<script>
+  var colors = ["red", "green", "orange", "blue", "yellow",  "indigo", "violet", "pink", "black", "brown"];
+  var clust = {{ clusters|safe }};
+  var recs = {{ records|safe }};
+  var w = 600, h = 400;
+  var circles = [];
+
+  for (var i = 0; i < clust.length; i++) {
+
+    var svg = d3.select("#id"+(i+1)).append("svg")
+      .attr("width", "100%")
+      .attr("height", "100%");
+
+    var circle = svg.selectAll("circle")
+      .data(d3.range(clust[i].points).map(function() {
+        return {
+          x: w * Math.random(),
+          y: h * Math.random(),
+          dx: Math.random() - 0.5,
+          dy: Math.random() - 0.5
+        };
+      }))
+    .enter().append("circle")
+      .attr("r", 5)
+      .attr("fill", colors[i])
+
+    var text = svg.append("text")
+      .attr("x", 20)
+      .attr("y", 20);
+
+    circles.push(circle);
+    if (recs.length > 0) {
+      text.text(clust[i].points + " tweets");
+    }
+  }
+</script>
+
+{% endblock %}
+  
+

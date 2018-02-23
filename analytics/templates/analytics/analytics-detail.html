@@ -1,0 +1,102 @@
+{% extends 'home/base.html' %}
+{% load static %}
+
+{%block content%}
+
+<!-- Header Section -->
+<section class="bg-dark text-white analytics-head">
+</section>
+
+<!-- Control Section -->
+<div class="container">
+  <div class="row" id="control">
+    <div class="col-lg-12">
+      <span class="btn btn-primary recent active"><i id="action" class="fa fa-pause pause"></i></span>              
+      <span id="info-span" class="btn btn-primary full disabled" href="">{% if recent %}Last 30 Min{% endif %}{% if full %}Full{% endif %}</span>
+    </div>    
+  </div>
+</div>
+
+<div id="update">{% include 'analytics/analytics-detail-update.html' %}</div>
+
+<!-- Table Section -->
+<section id="data">
+  <div class="container-fluid">
+      <div class="row">
+        <div class="col-lg-12 col-sm-12 col-xs-12">
+          <table class="table table-hover data-font">
+            <thead class="tab-head">
+              <tr>
+                <th scope="col">TweetId</th>
+                <th scope="col">Preprocessed Text</th>
+                <th scope="col">Full Text</th>
+                <th scope="col">Tweet_Created_Time</th>
+                <th scope="col">Cluster_Id</th>
+                <th scope="col">Cluster_Assignment_Time</th>
+              </tr>
+            </thead>
+            <tbody class="tab-data">
+              {% for record in records %}
+              <tr>
+                <td>{{ record.tweet_id }}</td>
+                <td>{{ record.preprocessed_text }}</td>
+                <td>{{ record.full_text }}</td>
+                <td>{{ record.created_at }}</td>
+                <td>{{ record.cluster_id }}</td>
+                <td>{{ record.assignment_time }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% if records|length > 15 %}
+        <button class="show-all show-btn btn btn-primary btn-md">Show All</button>
+      {% endif %}
+    </div>
+  </div>
+</section>
+      
+{% endblock %}
+
+{%block script%}
+
+<script src='{% static "javascript/jquery.min.js" %}'></script>
+
+<script>
+  var url_path = "";
+  var clust = {{ clust }};
+
+  if ('{{ recent }}' == 'active') {
+    url_path = "{% url 'analytics:recentAnalyticsDetailUpdate' clust %}";
+  }
+  else {
+    url_path = "{% url 'analytics:fullAnalyticsDetailUpdate' clust %}";
+  }
+
+  function updatePage(){
+    $('#update').html('').load(url_path);
+  }
+
+  var timer = setInterval(updatePage, 30000);
+
+  $("#action").on("click", function() {
+    $this = $(this);
+    if ($this.hasClass("play")) {
+      $this.addClass('pause').addClass('fa-pause').removeClass('play').removeClass('fa-play');
+      timer = setInterval(updatePage, 30000);
+      
+    }
+    else {
+      $this.addClass('play').addClass('fa-play').removeClass('pause').removeClass('fa-pause');
+      clearInterval(timer);
+    }
+  });
+
+</script>
+
+{% endblock %}
+
+
+      
+
