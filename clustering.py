@@ -27,7 +27,7 @@ c = connection.cursor()
 # MinHash and MinHash LSH Forest
 m1 = MinHash(num_perm=128)
 m2 = MinHash(num_perm=128)
-forest = MinHashLSHForest(num_perm=128)
+forest = None
 
 # Timers
 reset_start_time = dt.utcnow()
@@ -35,11 +35,10 @@ drop_start_time = dt.utcnow()
 tweet_rate_start = dt.utcnow()
 
 # Clustering
-limit = conf.no_clusters + 1
 vectorizer = HashingVectorizer(stop_words='english')
-centroids = {i : normalize(random(1, conf.no_features, density=0.000001, format='csr'), norm='l2') for i in range(1,limit)}
-hash_vec_sum = {i : None for i in range(1,limit)}
-cluster_point_count = {i : 0 for i in range(1,limit)}
+centroids = {}
+hash_vec_sum = {}
+cluster_point_count = {}
 cluster_point_count_old = cluster_point_count.copy()
 
 
@@ -48,6 +47,7 @@ def create_tables():
 	c.execute("""CREATE TABLE IF NOT EXISTS clusters
 		(cluster_id TEXT PRIMARY KEY,
 		 summary TEXT,
+		 tweet_count INTEGER,
 		 tweet_rate INTEGER)""")
 
 	c.execute("""CREATE TABLE IF NOT EXISTS recent_tweets
@@ -75,29 +75,27 @@ def create_tables():
 # Clean Tables : clusters, recent_tweets and history_tweets
 def clean_tables():
 	before = (dt.utcnow() - timedelta(minutes=conf.recent_duration)).strftime(conf.date_format)
-	cluster_recs = []
-
-	for i in range(1,limit):
-		cluster_recs.append((i, '', 0))
-
-	c.executemany(" INSERT OR REPLACE INTO clusters (cluster_id, summary, tweet_rate) VALUES (?, ?, ?) ", cluster_recs)
+	
 	c.execute(""" INSERT OR REPLACE INTO history_tweets (tweet_id, preprocessed_text, full_text, created_at, cluster_id, assignment_time, tweet)
 		SELECT tweet_id, preprocessed_text, full_text, created_at, cluster_id, assignment_time, tweet FROM recent_tweets WHERE assignment_time < '%s' """ % before)
 	c.execute(" DELETE FROM recent_tweets WHERE assignment_time < '%s' " % before)
+	c.execute(" DELETE FROM clusters ")
 	connection.commit()
 
 
 # Load MinHashLSHForest
 def load_forest():
+	global forest
+	forest = MinHashLSHForest(num_perm=128)
+
 	c.execute(" SELECT tweet_id, preprocessed_text FROM recent_tweets ")
 	rows = c.fetchall()
 
 	for row in rows:
-		if row[0] not in forest:
-			for t1 in word_tokenize(row[1]):
-				m1.update(t1.encode('utf8'))
+		for t1 in word_tokenize(row[1]):
+			m1.update(t1.encode('utf8'))
 
-			forest.add(row[0], m1)
+		forest.add(row[0], m1)
 	forest.index()
 	return rows
 
@@ -109,9 +107,6 @@ def recalculate_clusters(rows):
 	for row in rows:
 		cluster, assignment_time = calculate_cluster(row[1])
 
-		if (cluster == None):
-			cluster = ''
-
 		update_recs.append((cluster, assignment_time, row[0]))
 	
 	if len(update_recs) > 0:
@@ -122,6 +117,7 @@ def recalculate_clusters(rows):
 # Check Reset Time
 def check_reset_time():
 	global reset_start_time
+	global centroids
 	global hash_vec_sum
 	global cluster_point_count
 	global cluster_point_count_old
@@ -135,71 +131,52 @@ def check_reset_time():
 		c.execute(""" INSERT OR REPLACE INTO history_tweets (tweet_id, preprocessed_text, full_text, created_at, cluster_id, assignment_time, tweet)
 					SELECT tweet_id, preprocessed_text, full_text, created_at, cluster_id, assignment_time, tweet FROM recent_tweets """)
 		c.execute(" DELETE FROM recent_tweets ")
-		c.execute(" UPDATE clusters SET summary = ?, tweet_rate = ? ", ("", 0))		
+		c.execute(" DELETE FROM clusters ")		
 		connection.commit()
 
-		hash_vec_sum = dict.fromkeys( cluster_point_count.keys(), None)
-		cluster_point_count = dict.fromkeys( cluster_point_count.keys(), 0 )
+		centroids = {}
+		hash_vec_sum = {}
+		cluster_point_count = {}
 		cluster_point_count_old = cluster_point_count.copy()
 
-		load_forest()
+		tmp = load_forest()
 
 
-# Check Drop Time
+# Check Drop Time and Drop Inactive Clusters
 def check_drop_time():
 	global drop_start_time
+	global hash_vec_sum
 	global cluster_point_count
+	global cluster_point_count_old
 
 	if ((dt.utcnow() - drop_start_time).total_seconds()/60) > conf.recent_duration:
 
 		prev_time = drop_start_time.strftime(conf.date_format)
 		drop_start_time = dt.utcnow()
 
-		c.execute(" SELECT tweet_id, preprocessed_text FROM recent_tweets WHERE cluster_id = '%s' and assignment_time > '%s' " % ('', prev_time))
-		rows = c.fetchall()
+		drop_list = []
+		limit = len(centroids) + 1
 
-		for row in rows: 
-			cluster, assignment_time = calculate_cluster(row[1])
+		for i in range(1,limit):
+			c.execute(" SELECT * FROM recent_tweets WHERE cluster_id = '%s' and assignment_time > '%s' " % (i, prev_time))
+			rows = c.fetchall()
 
-			if cluster != None:
-				c.execute(" UPDATE recent_tweets SET cluster_id = '%s', assignment_time = '%s'  WHERE tweet_id = '%s' " % (cluster, assignment_time, row[0]))
-			else:
-				c.execute(""" INSERT OR REPLACE INTO history_tweets (tweet_id, preprocessed_text, full_text, created_at, cluster_id, assignment_time, tweet)
-					SELECT tweet_id, preprocessed_text, full_text, created_at, cluster_id, assignment_time, tweet FROM recent_tweets WHERE tweet_id = '%s' """ % row[0])
-				c.execute(" DELETE FROM recent_tweets WHERE tweet_id = '%s' " % row[0])
-		connection.commit()
-		drop_clusters(prev_time)
-		load_forest()
+			if(len(rows) < conf.drop_limit):
+				drop_list.append(str(i))
+				hash_vec_sum[i] = None
+				cluster_point_count[i] = 0
+				cluster_point_count_old[i] = 0
 
+		if len(drop_list) > 0:
+			print("Dropping Custers : %s " % drop_list)
 
-# Drop Inactive Clusters
-def drop_clusters(prev_time):
-	global hash_vec_sum
-	global cluster_point_count
-	global cluster_point_count_old
-
-	drop_list = []
-
-	for i in range(1,limit):
-		c.execute(" SELECT * FROM recent_tweets WHERE cluster_id = '%s' and assignment_time > '%s' " % (i, prev_time))
-		rows = c.fetchall()
-
-		if(len(rows) < conf.drop_limit):
-			drop_list.append(str(i))
-			hash_vec_sum[i] = None
-			cluster_point_count[i] = 0
-			cluster_point_count_old[i] = 0
-			cluster_point_count_old[i] = 0
-
-
-	if len(drop_list) > 0:
-		print("Dropping Custers : %s " % drop_list)
-
-		c.executemany(""" INSERT OR REPLACE INTO history_tweets (tweet_id, preprocessed_text, full_text, created_at, cluster_id, assignment_time, tweet)
-			SELECT tweet_id, preprocessed_text, full_text, created_at, cluster_id, assignment_time, tweet FROM recent_tweets WHERE cluster_id = ? """, drop_list)
-		c.executemany(" DELETE FROM recent_tweets WHERE cluster_id = ? ",  drop_list)
-		c.executemany(" UPDATE clusters SET summary = '', tweet_rate = 0 WHERE cluster_id = ? ",  drop_list)
-		connection.commit()		
+			c.executemany(""" INSERT OR REPLACE INTO history_tweets (tweet_id, preprocessed_text, full_text, created_at, cluster_id, assignment_time, tweet)
+				SELECT tweet_id, preprocessed_text, full_text, created_at, cluster_id, assignment_time, tweet FROM recent_tweets WHERE cluster_id = ? """, drop_list)
+			c.executemany(" DELETE FROM recent_tweets WHERE cluster_id = ? ",  drop_list)
+			c.executemany(" UPDATE clusters SET summary = '', tweet_count = 0, tweet_rate = 0 WHERE cluster_id = ? ",  drop_list)
+			connection.commit()
+		
+			tmp = load_forest()
 
 
 # Cluster Tweet Rate
@@ -207,20 +184,23 @@ def calculate_tweet_rate():
 	global tweet_rate_start
 	global cluster_point_count
 	global cluster_point_count_old
-
+	
 	cluster_recs = []
 
 	if ((dt.utcnow() - tweet_rate_start).total_seconds()/60) > conf.tweet_rate_limit:
 		tweet_rate_start = dt.utcnow()
 
+		print("Calculating Cluster Tweet Rate")
+		limit = len(centroids) + 1
+
 		for i in range(1,limit):
 			rate = cluster_point_count[i] - cluster_point_count_old[i]
 
-			cluster_recs.append((rate, str(i)))
+			cluster_recs.append((cluster_point_count[i], rate, str(i)))
 
 		cluster_point_count_old = cluster_point_count.copy()
 
-		c.executemany(" UPDATE clusters SET tweet_rate = ? WHERE cluster_id = ? ", cluster_recs)
+		c.executemany(" UPDATE clusters SET tweet_count = ?, tweet_rate = ? WHERE cluster_id = ? ", cluster_recs)
 		connection.commit()
 
 
@@ -251,24 +231,40 @@ def calculate_cluster(tweet_text):
 	global centroids
 	global hash_vec_sum
 	global cluster_point_count
+	global cluster_point_count_old
 
 	tweet_model = vectorizer.fit_transform([tweet_text])
 	cos_distance = {}
+	cluster = None
 
-	for k, v in centroids.items():		
-		cos_distance[k] = cosine_distances(tweet_model[0], v).item(0,0)
+	if(len(centroids) > 0):
 
-	cluster, distance = min(cos_distance.items(), key=lambda x: x[1])
+		for k, v in centroids.items():		
+			cos_distance[k] = cosine_distances(tweet_model, v).item(0,0)
 
-	if(distance < conf.max_cos_distance):
-		hash_vec_sum[cluster] = (hash_vec_sum[cluster] + tweet_model) if hash_vec_sum.get(cluster) != None else tweet_model
-		cluster_point_count[cluster] = cluster_point_count[cluster] + 1
+		cluster, distance = min(cos_distance.items(), key=lambda x: x[1])
 
-		centroids[cluster]= hash_vec_sum[cluster]/cluster_point_count[cluster]
-
-		return cluster, dt.utcnow().strftime(conf.date_format)
+		if(distance < conf.max_cos_distance):
+			hash_vec_sum[cluster] = (hash_vec_sum[cluster] + tweet_model)
+			cluster_point_count[cluster] = cluster_point_count[cluster] + 1
+			c.execute(" UPDATE clusters SET tweet_count = ? WHERE cluster_id = ? ", (cluster_point_count[cluster], cluster))
+		else:
+			cluster = len(centroids) + 1
+			hash_vec_sum[cluster] =  tweet_model
+			cluster_point_count[cluster] = 1
+			cluster_point_count_old[cluster] = 0
+			c.execute(" INSERT OR REPLACE INTO clusters (cluster_id, summary, tweet_count, tweet_rate) VALUES (?, ?, ?, ?) ", (cluster, '', cluster_point_count[cluster], 1))
 	else:
-		return None, dt.utcnow().strftime(conf.date_format)	
+		cluster = 1
+		hash_vec_sum[cluster] =  tweet_model
+		cluster_point_count[cluster] = 1
+		cluster_point_count_old[cluster] = 0
+		c.execute(" INSERT OR REPLACE INTO clusters (cluster_id, summary, tweet_count, tweet_rate) VALUES (?, ?, ?, ?) ", (cluster, '', cluster_point_count[cluster], 1))
+	
+	connection.commit()
+
+	centroids[cluster]= hash_vec_sum[cluster]/cluster_point_count[cluster]
+	return cluster, dt.utcnow().strftime(conf.date_format)
 
 
 # Get Extended Tweets
@@ -353,9 +349,6 @@ def store_tweet(tweet, text):
 					forest.add(tweet.id_str, m1)
 					cluster, assignment_time = calculate_cluster(text)					
 
-					if cluster == None:
-						cluster = ''
-
 					Tweet(tweet.id_str,
 				  		text,
 						tweet.full_text,
@@ -368,9 +361,6 @@ def store_tweet(tweet, text):
 		else:
 			forest.add(tweet.id_str, m1)
 			cluster, assignment_time = calculate_cluster(text)
-
-			if cluster == None:
-				cluster = ''
 
 			Tweet(tweet.id_str,
 			  	text,

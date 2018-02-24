@@ -78,20 +78,31 @@ def getRecentClusters():
 	c = getDBConnection()
 
 	c.execute(""" SELECT cluster_id, COUNT(tweet_id) as points FROM recent_tweets
-		 WHERE assignment_time > '%s' GROUP BY cluster_id ORDER BY points DESC LIMIT 10 """ % (dt.utcnow() - timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S'))
+		 WHERE assignment_time > '%s' GROUP BY cluster_id ORDER BY points DESC """ % (dt.utcnow() - timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S'))
 	rows1 = c.fetchall()
 	r1 = []
+	tmp = []
+	idx = 0
 
 	for r in rows1:
-		if (r[0] != ''):
-			r1.append({'cluster_id': r[0], 'points': r[1]})
 
-	c.execute(" SELECT * FROM clusters WHERE cluster_id != '' ORDER BY tweet_rate DESC ")
+		if(idx < 10):
+			r1.append({'cluster_id': r[0], 'points': r[1]})
+			idx += 1
+
+		tmp.append([r[0], r[1]])
+
+	c.execute(" SELECT * FROM clusters WHERE cluster_id != '' ORDER BY tweet_count DESC ")
 	rows2 = c.fetchall()
 	r2 = []
 
 	for r in rows2:
-		r2.append({'cluster_id': r[0], 'summary': r[1], 'tweet_rate': r[2]})
+		count = r[2]
+
+		if r[0] in tmp:
+			count = tmp[r[0]]
+
+		r2.append({'cluster_id': r[0], 'summary': r[1], 'tweet_count': count, 'tweet_rate': r[3]})
 
 	return r1, r2
 
@@ -99,8 +110,11 @@ def getRecentClusterDetail(cluster):
 	c = getDBConnection()
 
 	c.execute(" SELECT summary FROM clusters WHERE cluster_id = '%s' " % cluster)
-	r2 = c.fetchall()
-	r2 = r2[0][0]
+	rows2 = c.fetchall()
+	r2 = ""
+
+	if len(rows2) > 0:
+		r2 = rows2[0][0]
 
 	c.execute(" SELECT * FROM recent_tweets WHERE cluster_id = '%s' AND  assignment_time > '%s' " % (cluster, (dt.utcnow() - timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S')))
 	rows3 = c.fetchall()
@@ -122,20 +136,19 @@ def getRecentClusterDetail(cluster):
 def getFullClusters():
 	c = getDBConnection()
 
-	c.execute(" SELECT cluster_id, COUNT(tweet_id) as points FROM recent_tweets GROUP BY cluster_id ORDER BY points DESC LIMIT 10 ")
-	rows1 = c.fetchall()
+	c.execute(" SELECT * FROM clusters WHERE cluster_id != '' ORDER BY tweet_count DESC ")
+	rows = c.fetchall()
 	r1 = []
-
-	for r in rows1:
-		if (r[0] != ''):
-			r1.append({'cluster_id': r[0], 'points': r[1]})
-
-	c.execute(" SELECT * FROM clusters WHERE cluster_id != '' ORDER BY tweet_rate DESC ")
-	rows2 = c.fetchall()
 	r2 = []
+	idx = 0
 
-	for r in rows2:
-		r2.append({'cluster_id': r[0], 'summary': r[1], 'tweet_rate': r[2]})
+	for r in rows:
+
+		if(idx < 10):
+			r1.append({'cluster_id': r[0], 'points': r[2]})
+			idx += 1
+
+		r2.append({'cluster_id': r[0], 'summary': r[1], 'tweet_count': r[2], 'tweet_rate': r[3]})
 
 	return r1, r2
 
@@ -163,5 +176,7 @@ def getFullClusterDetail(cluster):
 
 	if (len(rows1) > 20):
 		r2 = summarize(r2, word_count = 25)
+	else:
+		r2 = ""
 
 	return r1, r2, r3

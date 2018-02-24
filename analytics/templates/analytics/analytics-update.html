@@ -42,6 +42,7 @@
             <tr>
               <th scope="col">Cluster</th>
               <th scope="col">Summery</th>
+              <th scope="col">Tweet Count</th>
               <th scope="col">Tweet Rate (per min)</th>
             </tr>
           </thead>
@@ -50,6 +51,7 @@
             <tr>
               <td>{{ record.cluster_id }}</td>
               <td>{{ record.summary }}</td>
+              <td>{{ record.tweet_count }}</td>
               <td>{{ record.tweet_rate }}</td>
             </tr>
             {% endfor %}
@@ -80,7 +82,6 @@
   var colors = ["red", "green", "orange", "blue", "yellow",  "indigo", "violet", "pink", "black", "brown"];
   var clust = {{ clusters|safe }};
   var recs = {{ records|safe }};
-  var w = 600, h = 400;
   var circles = [];
 
   for (var i = 0; i < clust.length; i++) {
@@ -88,6 +89,9 @@
     var svg = d3.select("#id"+(i+1)).append("svg")
       .attr("width", "100%")
       .attr("height", "100%");
+
+    var w = document.getElementById("id"+(i+1)).offsetWidth;
+    var h = document.getElementById("id"+(i+1)).offsetHeight;
 
     var circle = svg.selectAll("circle")
       .data(d3.range(clust[i].points).map(function() {
@@ -107,6 +111,7 @@
       .attr("y", 20);
 
     circles.push(circle);
+    
     if (recs.length > 0) {
       text.text(clust[i].points + " tweets");
     }

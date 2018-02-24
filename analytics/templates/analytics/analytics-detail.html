@@ -78,7 +78,11 @@
     $('#update').html('').load(url_path);
   }
 
-  var timer = setInterval(updatePage, 30000);
+  var timer;
+
+  if($("#action").hasClass("pause")){
+    timer = setInterval(updatePage, 30000);
+  }
 
   $("#action").on("click", function() {
     $this = $(this);

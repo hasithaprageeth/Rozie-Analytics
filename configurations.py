@@ -15,9 +15,8 @@ language = 'en'			# Language filter for tweets
 min_tweet_length = 3	# Minimum Length of a tweet, to consider for clustering 
 
 # Clusters
-no_clusters = 50		# Number of clusters
 drop_limit = 50			# Minimum tweet count of a cluster to avoid dropping
-max_cos_distance = 1.0	# Maximum cosine distance limit allowed to assign a tweet to a cluster
+max_cos_distance = 0.6	# Maximum cosine distance limit allowed to assign a tweet to a cluster
 
 # CSR Model
 no_features = 1048576	# Number of features to consider for Hash Vectorized Model
